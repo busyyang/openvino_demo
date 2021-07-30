@@ -73,14 +73,15 @@
 
 4. 添加`opencv_xxx.dll`和`inference_engine_xxx.dll`的路径到path中，这样才能在运行的时候找到dll文件（写了path以后需要重启VS才能生效）。
    ~~~
-   C:\Program Files (x86)\IntelSWTools\openvino\opencv\bin
-   C:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\bin\intel64\Release
-   C:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\external\tbb\bin
-   C:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\ngraph\lib
+   C:\Program Files (x86)\Intel\openvino_2021\openvino\opencv\bin
+   C:\Program Files (x86)\Intel\openvino_2021\deployment_tools\inference_engine\bin\intel64\Release
+   C:\Program Files (x86)\Intel\openvino_2021\deployment_tools\inference_engine\bin\intel64\Debug
+   C:\Program Files (x86)\Intel\openvino_2021\deployment_tools\inference_engine\external\tbb\bin
+   C:\Program Files (x86)\Intel\openvino_2021\deployment_tools\ngraph\lib
    ~~~
 
 5. 编译成功，但是执行`Release`的时候出现`?fill@numa_topology@internal@tbb@@YAXPEAH@Z于动态链接库xxx/inference_engine.dll`上的错误时候，到编译好的可执行程序目录下，先执行以下`C:\Program Files(x86)\IntelSWTools\openvino\bin\setupvars.bat`，发现同窗口下执行文件就没有这个错了，应该是环境变量设置不完善的问题。用`Debug`模式调试没问题。
-6. (optinal) 在`openvino_2021_demo`项目中，由于使用到了OpenVINO官方demo提供的一些help函数，所以添加了一个额外的include引用地址：
+6. (optinal) 在`openvino_2021_demo`项目中，由于使用到了OpenVINO官方demo提供的一些help函数，所以添加了一个额外的include引用地址，如果没有适用到的话，可以不添加这个不是必须的：
    ~~~
    C:\Program Files (x86)\Intel\openvino_2021\deployment_tools\inference_engine\samples\cpp\common
    ~~~
@@ -94,81 +95,6 @@
       auto moutputholder = moutput->rmap();
       float * o = moutputholder.as<InferenceEngine::PrecisionTrait<InferenceEngine::Precision::FP32>::value_type *>();
       ~~~
-   以下是完整的测试代码：
-   ~~~cpp
-   #include <inference_engine.hpp>
-   #include <opencv2\opencv.hpp>
-   #include <samples\ocv_common.hpp>
-   #include <samples\classification_results.h>
-   #include <iostream>
-   #include <fstream>
-
-   int main()
-   {
-      // --------------------------- 1. Load Inference engine instance -------------------------------------
-      std::cout << "Loading Inference Engine......" << std::endl;
-      InferenceEngine::Core ie;
-      
-      // --------------------------- 2. Read a model in OpenVINO IR    -------------------------------------
-      InferenceEngine::CNNNetwork network = ie.ReadNetwork("models/squeezenet1.1.xml");
-
-      // --------------------------- 3. Prepare input and output blobs    ----------------------------------
-      // input
-      InferenceEngine::InputsDataMap inputsInfo(network.getInputsInfo());
-      printf("\tInput Node: %d\n", inputsInfo.size());
-      std::string input_name = network.getInputsInfo().begin()->first;
-
-      auto inputInfoItem = *inputsInfo.begin();
-      inputInfoItem.second->setPrecision(InferenceEngine::Precision::U8);
-      inputInfoItem.second->setLayout(InferenceEngine::Layout::NHWC);
-
-      // output
-      InferenceEngine::OutputsDataMap outputsInfo(network.getOutputsInfo());
-      printf("\tOutput Node: %d\n", outputsInfo.size());
-      InferenceEngine::DataPtr output_info = network.getOutputsInfo().begin()->second;
-      std::string output_name = network.getOutputsInfo().begin()->first;
-
-      output_info->setPrecision(InferenceEngine::Precision::FP32);
-
-      // --------------------------- 4. Loading model to the device ------------------------------------------
-      InferenceEngine::ExecutableNetwork executable_network = ie.LoadNetwork(network, "CPU");
-      //std::map<std::string, std::string> config = { { InferenceEngine::PluginConfigParams::KEY_PERF_COUNT, InferenceEngine::PluginConfigParams::YES } };
-      //InferenceEngine::ExecutableNetwork executable_network = ie.LoadNetwork(network, "CPU", config);
-
-      // --------------------------- 5. Create infer request -------------------------------------------------
-      InferenceEngine::InferRequest inferRequst = executable_network.CreateInferRequest();
-
-      // --------------------------- 6. Prepare input        -------------------------------------------------
-      std::string img_name = "assert/car.png";
-      cv::Mat image = cv::imread(img_name);
-      cv::resize(image, image, cv::Size(227, 227));
-      InferenceEngine::Blob::Ptr imgBlob = wrapMat2Blob(image);
-      inferRequst.SetBlob(input_name, imgBlob);
-
-      // --------------------------- 7. Do inference        -------------------------------------------------
-      inferRequst.Infer();
-      
-      // --------------------------- 8. Process output        -----------------------------------------------
-      InferenceEngine::Blob::Ptr output = inferRequst.GetBlob(output_name);
-      std::string label_name = "models/squeezenet1.1.labels";
-      std::ifstream in(label_name);
-      std::vector<std::string> labels;
-      std::string line;
-      if (in)
-      {
-         while (std::getline(in,line))
-         {
-            labels.push_back(line);
-         }
-      }
-      ClassificationResult classificationResult(output, {img_name}, 1, 5, labels);
-      classificationResult.print();
-
-
-      getchar();
-      return 0;
-   }
-   ~~~
 
 8. 参考这个网址配置环境：https://www.bilibili.com/video/BV1Hz4y1U7g6?t=1418
 9.  参考这个网址写一个简单的demo：https://github.com/openvinotoolkit/openvino/blob/master/inference-engine/samples/hello_classification/main.cpp
