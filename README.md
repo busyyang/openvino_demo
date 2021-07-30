@@ -88,7 +88,14 @@
 
 7. 用一个测试代码，能运行起来的话就安装没问题(Debug模式下)，里面主要的逻辑就是:加载模型，处理输入输出的blob，模型加载到设备上，创建推理请求，然后把数据喂到输入节点上，执行推理请求，数据后处理的过程。后三个步骤可以执行多次，前面的步骤执行一次就可以了。
     - 这里单独理解了一下`InferenceEngine::InputsDataMap`和`InferenceEngine::OutputsDataMap`这两个数据类型，主要是用来处理模型的输入输出节点的，打开可以看到都是`std::map<std::string, DataPtr>`这个类型的，第一个是`std::string`数列类型的，是节点的名字，第二个是`DataPtr`数据类型的，查看代码是叫一种`smart pointer to the xxx instance`。
-    - 通过`inferRequst.SetBlob(input_name, imgBlob)`设置输入层的数据blob，这里调用了`samples/ocv_common.hpp`文件中的`wrapMat2Blob`函数将cvMat数据类型转化为`InferenceEngine::Blob::Ptr`类型进行输入。在输出的时候`InferenceEngine::Blob::Ptr output = inferRequst.GetBlob(output_name)`获取输出节点的数据。可以通过`InferenceEngine::SizeVector output_size = output->getTensorDesc().getDims();`来查看输入节点的维度。
+    - 通过`inferRequst.SetBlob(input_name, imgBlob)`设置输入层的数据blob，这里调用了`samples/ocv_common.hpp`文件中的`wrapMat2Blob`函数将cvMat数据类型转化为`InferenceEngine::Blob::Ptr`类型进行输入。在输出的时候`InferenceEngine::Blob::Ptr output = inferRequst.GetBlob(output_name)`获取输出节点的数据。可以通过`InferenceEngine::SizeVector output_size = output->getTensorDesc().getDims();`来查看输入节点的维度。更一般地，我写了一个将float数组的数据转化为Blob::Ptr数据的函数，可以用来参考改其他的数据：
+      ~~~cpp
+      static InferenceEngine::Blob::Ptr moveData2Blob(float *indata,uint64 length, uint64 channel)
+      {
+        InferenceEngine::TensorDesc tDesc(InferenceEngine::Precision::FP32, { 1,length,channel },InferenceEngine::Layout::ANY);
+        return InferenceEngine::make_shared_blob<float>(tDesc, indata);
+      }
+      ~~~
     - 在输出的部分，直接调用了`samples\classification_results.h`文件中的`ClassificationResult`来处理的。如果不调用这个的话，可以使用如下代码得到output的数据：
       ~~~cpp
       InferenceEngine::MemoryBlob::Ptr moutput = InferenceEngine::as<InferenceEngine::MemoryBlob>(output);
