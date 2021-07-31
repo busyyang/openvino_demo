@@ -92,11 +92,27 @@
       ~~~cpp
       static InferenceEngine::Blob::Ptr moveData2Blob(float *indata,uint64 length, uint64 channel)
       {
-        InferenceEngine::TensorDesc tDesc(InferenceEngine::Precision::FP32, { 1,length,channel },InferenceEngine::Layout::ANY);
+        InferenceEngine::TensorDesc tDesc(InferenceEngine::Precision::FP32, { 1,length, channel },InferenceEngine::Layout::ANY);
         return InferenceEngine::make_shared_blob<float>(tDesc, indata);
       }
+
+      float indata[400]={0};
+      InferenceEngine::Blob::Ptr inBlob = moveData2Blob(indata, 400, 1);
+      inferRequst.SetBlob(input_name, inBlob);
       ~~~
-    - 在输出的部分，直接调用了`samples\classification_results.h`文件中的`ClassificationResult`来处理的。如果不调用这个的话，可以使用如下代码得到output的数据：
+    - 在输出的部分，直接调用了`samples\classification_results.h`文件中的`ClassificationResult`来处理的。这里面的核心部分使用了`std::partial_sort`来进行topK的获取：
+      ~~~cpp
+      std::vector<unsigned> indexes(1000); //定义一个1000个数的vector
+      std::iota(std::begin(indexes), std::end(indexes), 0); // 将indexes填写为0-999的序列
+      // 通过std::partial_sort对batchData的数据进行排序，从大到小的排序，排序的结果为indexes更新为大小顺序的索引值。
+      std::partial_sort(std::begin(indexes), std::begin(indexes) + n, std::end(indexes),
+                              [&batchData](unsigned l, unsigned r) {
+                                  return batchData[l] > batchData[r];
+                              });
+
+      ~~~
+
+      如果不调用这个的话，可以使用如下代码得到output的数据：
       ~~~cpp
       InferenceEngine::MemoryBlob::Ptr moutput = InferenceEngine::as<InferenceEngine::MemoryBlob>(output);
       auto moutputholder = moutput->rmap();
